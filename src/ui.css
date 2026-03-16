@@ -1,0 +1,227 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: #333;
+  background: #f5f5f5;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  background: #fff;
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.frame-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #666;
+}
+
+.frame-name {
+  font-weight: 500;
+}
+
+.frame-size {
+  color: #999;
+}
+
+.main {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.no-selection {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.setup-view h3,
+.active-view h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.presets {
+  margin-bottom: 24px;
+}
+
+.presets h4 {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #666;
+}
+
+.presets button {
+  padding: 6px 12px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.presets button:hover {
+  background: #f0f0f0;
+}
+
+.breakpoints {
+  margin-bottom: 24px;
+}
+
+.breakpoints h4 {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: #666;
+}
+
+.breakpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.breakpoint-row input[type="text"],
+.breakpoint-row input[type="number"] {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 11px;
+  width: 80px;
+}
+
+.breakpoint-row input[type="text"] {
+  flex: 1;
+  min-width: 80px;
+}
+
+.breakpoint-row span {
+  color: #999;
+  font-size: 11px;
+}
+
+.breakpoint-row button {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.breakpoint-row button:hover {
+  background: #f0f0f0;
+}
+
+.add-breakpoint {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #666;
+  margin-top: 8px;
+}
+
+.add-breakpoint:hover {
+  background: #f9f9f9;
+}
+
+.create-button {
+  width: 100%;
+  padding: 12px;
+  background: #18a0fb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.create-button:hover {
+  background: #0d8cdb;
+}
+
+.active-view {
+  text-align: center;
+}
+
+.breakpoint-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 24px 0;
+}
+
+.breakpoint-indicator-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.breakpoint-indicator-item span:first-child {
+  font-weight: 500;
+}
+
+.breakpoint-indicator-item span:last-child {
+  color: #666;
+  font-size: 11px;
+}
+
+.hint {
+  color: #999;
+  font-size: 11px;
+  margin-top: 16px;
+}
+
+.footer {
+  background: #fff;
+  padding: 12px 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.footer button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.footer button:hover {
+  background: #f5f5f5;
+}

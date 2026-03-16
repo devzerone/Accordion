@@ -1,0 +1,11 @@
+{
+  "name": "Accordion",
+  "id": "accordion-responsive-layout",
+  "description": "아코디언처럼 늘어났다 줄어들며 반응형 레이아웃을 보여주는 Figma 플러그인",
+  "api": "1.0.0",
+  "main": "main.js",
+  "ui": "ui.html",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "editorType": ["figma"]
+}
