@@ -1,4 +1,4 @@
-// Enhanced React UI Component
+// Linear-style Figma Plugin UI
 import React, { useState, useEffect } from 'react';
 
 interface Breakpoint {
@@ -6,12 +6,6 @@ interface Breakpoint {
   maxWidth: number;
   frameId: string;
   name: string;
-}
-
-interface AdaptiveLayoutData {
-  breakpoints: Breakpoint[];
-  currentFrameId: string;
-  currentBreakpointIndex?: number;
 }
 
 interface FrameInfo {
@@ -38,12 +32,10 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<LoadingState>({ isLoading: false });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [availableFrames, setAvailableFrames] = useState<FrameInfo[]>([]);
   const [currentBreakpoint, setCurrentBreakpoint] = useState<string | null>(null);
   const [masterFrameName, setMasterFrameName] = useState<string>('');
 
   useEffect(() => {
-    // Listen for messages from plugin code
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
@@ -54,62 +46,34 @@ const App: React.FC = () => {
 
     switch (msg.type) {
       case 'selection-info':
-        handleSelectionInfo(msg.data);
+        if (msg.data) {
+          setSelectedFrame(msg.data);
+          setIsResponsive(msg.data.hasAdaptiveLayout);
+          if (msg.data.adaptiveLayout) {
+            setBreakpoints(msg.data.adaptiveLayout.breakpoints);
+            setMasterFrameName(msg.data.frameName);
+          }
+        }
         break;
       case 'error':
-        handleError(msg.message, msg.details);
+        setError(msg.message);
+        setTimeout(() => setError(null), 5000);
         break;
       case 'success':
-        handleSuccess(msg.message, msg.data);
+        setSuccess(msg.message);
+        setTimeout(() => setSuccess(null), 3000);
         break;
       case 'loading-state':
         setLoading(msg.data);
         break;
-      case 'available-frames':
-        setAvailableFrames(msg.data);
-        break;
       case 'breakpoint-changed':
         setCurrentBreakpoint(msg.data.breakpointName);
         break;
-      case 'frame-swapped':
-        handleSuccess('Layout updated successfully', msg.data);
-        break;
       case 'layout-created':
         setIsResponsive(true);
-        handleSuccess(msg.message || 'Adaptive layout created!', msg.data);
+        setSuccess(msg.message || 'Adaptive layout created!');
+        setTimeout(() => setSuccess(null), 3000);
         break;
-    }
-  };
-
-  const handleSelectionInfo = (data: any) => {
-    if (data) {
-      setSelectedFrame(data);
-      setIsResponsive(data.hasAdaptiveLayout);
-      if (data.adaptiveLayout) {
-        setBreakpoints(data.adaptiveLayout.breakpoints);
-        setMasterFrameName(data.frameName);
-      }
-    } else {
-      setSelectedFrame(null);
-      setIsResponsive(false);
-    }
-    setError(null);
-  };
-
-  const handleError = (message: string, details?: string) => {
-    setError(details ? `${message}: ${details}` : message);
-    setTimeout(() => setError(null), 5000);
-    setLoading({ isLoading: false });
-  };
-
-  const handleSuccess = (message: string, data?: any) => {
-    setSuccess(message);
-    setTimeout(() => setSuccess(null), 3000);
-    setLoading({ isLoading: false });
-
-    // Update breakpoints if returned
-    if (data?.data?.breakpoints) {
-      setBreakpoints(data.data.breakpoints);
     }
   };
 
@@ -117,24 +81,13 @@ const App: React.FC = () => {
     parent.postMessage({ pluginMessage: { type, data } }, '*');
   };
 
-  const handleCreateAdaptiveLayout = () => {
+  const handleCreateLayout = () => {
     const validBreakpoints = breakpoints.filter((bp) => bp.frameId !== '');
-
     if (validBreakpoints.length === 0) {
-      setError('Please select at least one frame for a breakpoint');
+      setError('Please link at least one frame to a breakpoint');
+      setTimeout(() => setError(null), 5000);
       return;
     }
-
-    // Validate breakpoint ranges don't overlap incorrectly
-    for (let i = 0; i < validBreakpoints.length - 1; i++) {
-      const current = validBreakpoints[i];
-      const next = validBreakpoints[i + 1];
-      if (current.maxWidth >= next.minWidth) {
-        setError(`Breakpoint ranges overlap: ${current.name} and ${next.name}`);
-        return;
-      }
-    }
-
     setLoading({ isLoading: true, message: 'Creating adaptive layout...' });
     sendMessage('create-adaptive-layout', {
       breakpoints: validBreakpoints,
@@ -142,39 +95,23 @@ const App: React.FC = () => {
     });
   };
 
-  const handleFrameSelect = (index: number, specificFrameId?: string) => {
-    setLoading({
-      isLoading: true,
-      message: 'Select a frame from the canvas...',
-    });
-
-    if (specificFrameId) {
-      sendMessage('select-frame-for-breakpoint', {
-        breakpointIndex: index,
-        frameId: specificFrameId,
-      });
-    } else {
-      sendMessage('select-frame-for-breakpoint', {
-        breakpointIndex: index,
-      });
-    }
+  const handleFrameSelect = (index: number) => {
+    setLoading({ isLoading: true, message: 'Select a frame from canvas...' });
+    sendMessage('select-frame-for-breakpoint', { breakpointIndex: index });
   };
 
   const handleTestBreakpoint = (index: number) => {
     if (!breakpoints[index].frameId) {
-      setError('This breakpoint does not have a linked frame');
+      setError('This breakpoint needs a linked frame');
+      setTimeout(() => setError(null), 5000);
       return;
     }
-
     setLoading({ isLoading: true, message: `Switching to ${breakpoints[index].name}...` });
     sendMessage('test-breakpoint', { breakpointIndex: index });
   };
 
-  const handlePresetLoad = (preset: string) => {
-    const presets: Record<
-      string,
-      { name: string; minWidth: number; maxWidth: number; frameId: string }[]
-    > = {
+  const handlePreset = (preset: 'ios' | 'android' | 'web') => {
+    const presets = {
       ios: [
         { name: 'iPhone SE', minWidth: 0, maxWidth: 375, frameId: '' },
         { name: 'iPhone 14', minWidth: 376, maxWidth: 390, frameId: '' },
@@ -194,11 +131,7 @@ const App: React.FC = () => {
         { name: 'Desktop', minWidth: 1025, maxWidth: 9999, frameId: '' },
       ],
     };
-
-    setBreakpoints((presets[preset] || presets.web).map((bp) => ({
-      ...bp,
-      frameId: '',
-    })));
+    setBreakpoints(presets[preset].map((bp) => ({ ...bp, frameId: '' })));
     setIsResponsive(false);
     setCurrentBreakpoint(null);
   };
@@ -209,229 +142,655 @@ const App: React.FC = () => {
     setBreakpoints(updated);
   };
 
-  const addBreakpoint = () => {
-    setBreakpoints([
-      ...breakpoints,
-      {
-        name: `Breakpoint ${breakpoints.length + 1}`,
-        minWidth: 0,
-        maxWidth: 9999,
-        frameId: '',
-      },
-    ]);
-  };
-
-  const removeBreakpoint = (index: number) => {
-    const updated = breakpoints.filter((_, i) => i !== index);
-    setBreakpoints(updated);
-  };
-
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-top">
-          <h2>Accordion</h2>
-          <span className="version">v1.0</span>
+    <div style={{
+      width: '100%',
+      height: '100vh',
+      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      color: '#e5e5e5',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{
+        height: '56px',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 20px',
+        background: 'rgba(10, 10, 10, 0.8)',
+        backdropFilter: 'blur(20px)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '28px',
+            height: '28px',
+            background: 'linear-gradient(135deg, #5b5fc7 0%, #4045a3 100%)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '16px',
+            fontWeight: '700',
+          }}>
+            🪗
+          </div>
+          <div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              letterSpacing: '-0.02em',
+              background: 'linear-gradient(135deg, #fff 0%, #a5a5a5 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              Accordion
+            </div>
+            <div style={{
+              fontSize: '11px',
+              color: '#737373',
+              marginTop: '1px',
+            }}>
+              Responsive Layout
+            </div>
+          </div>
         </div>
-        {selectedFrame && (
-          <div className="frame-info">
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {selectedFrame && (
             <input
               type="text"
               value={masterFrameName}
               onChange={(e) => setMasterFrameName(e.target.value)}
               placeholder="Frame name"
-              className="frame-name-input"
+              style={{
+                padding: '6px 12px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '6px',
+                color: '#e5e5e5',
+                fontSize: '12px',
+                outline: 'none',
+              }}
             />
-            <span className="frame-size">
-              {Math.round(selectedFrame.width)} × {Math.round(selectedFrame.height)}
-            </span>
-          </div>
-        )}
-      </header>
+          )}
+        </div>
+      </div>
 
       {/* Status Messages */}
-      {error && <div className="message error">{error}</div>}
-      {success && <div className="message success">{success}</div>}
-      {loading.isLoading && (
-        <div className="message loading">
-          {loading.message || 'Loading...'}
+      {error && (
+        <div style={{
+          margin: '16px 20px 0',
+          padding: '12px 16px',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '8px',
+          color: '#fca5a5',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span>⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
-      <main className="main">
+      {success && (
+        <div style={{
+          margin: '16px 20px 0',
+          padding: '12px 16px',
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          borderRadius: '8px',
+          color: '#86efac',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span>✓</span>
+          <span>{success}</span>
+        </div>
+      )}
+
+      {loading.isLoading && (
+        <div style={{
+          margin: '16px 20px 0',
+          padding: '12px 16px',
+          background: 'rgba(91, 95, 199, 0.1)',
+          border: '1px solid rgba(91, 95, 199, 0.3)',
+          borderRadius: '8px',
+          color: '#a5b4fc',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <div style={{
+            width: '14px',
+            height: '14px',
+            border: '2px solid #5b5fc7',
+            borderTop: 'transparent',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}></div>
+          <span>{loading.message || 'Loading...'}</span>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
         {!selectedFrame ? (
-          <div className="no-selection">
-            <div className="no-selection-icon">🪗</div>
-            <h3>Select a Frame</h3>
-            <p>Select a frame to create an adaptive layout</p>
+          <div style={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontSize: '48px',
+              marginBottom: '16px',
+              opacity: 0.5,
+            }}>🪗</div>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#e5e5e5',
+              marginBottom: '8px',
+            }}>
+              Select a Frame
+            </div>
+            <div style={{
+              fontSize: '13px',
+              color: '#737373',
+            }}>
+              Choose a frame to create an adaptive layout
+            </div>
           </div>
         ) : !isResponsive ? (
-          <div className="setup-view">
-            <h3>Create Adaptive Layout</h3>
-
-            <div className="presets">
-              <h4>Quick Presets</h4>
-              <div className="preset-buttons">
-                <button onClick={() => handlePresetLoad('ios')} className="preset-btn ios">
-                  iOS
+          <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+            {/* Presets */}
+            <div style={{
+              marginBottom: '24px',
+              padding: '20px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '12px',
+              backdropFilter: 'blur(10px)',
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#737373',
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                Quick Presets
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => handlePreset('ios')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: 'linear-gradient(135deg, rgba(91, 95, 199, 0.15) 0%, rgba(64, 69, 163, 0.15) 100%)',
+                    border: '1px solid rgba(91, 95, 199, 0.3)',
+                    borderRadius: '8px',
+                    color: '#a5a5a5',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(91, 95, 199, 0.25) 0%, rgba(64, 69, 163, 0.25) 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(91, 95, 199, 0.15) 0%, rgba(64, 69, 163, 0.15) 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🍎 iOS
                 </button>
-                <button onClick={() => handlePresetLoad('android')} className="preset-btn android">
-                  Android
+                <button
+                  onClick={() => handlePreset('android')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: 'linear-gradient(135deg, rgba(61, 220, 132, 0.15) 0%, rgba(48, 189, 113, 0.15) 100%)',
+                    border: '1px solid rgba(61, 220, 132, 0.3)',
+                    borderRadius: '8px',
+                    color: '#a5a5a5',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(61, 220, 132, 0.25) 0%, rgba(48, 189, 113, 0.25) 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(61, 220, 132, 0.15) 0%, rgba(48, 189, 113, 0.15) 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🤖 Android
                 </button>
-                <button onClick={() => handlePresetLoad('web')} className="preset-btn web">
-                  Web
+                <button
+                  onClick={() => handlePreset('web')}
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    background: 'linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%)',
+                    border: '1px solid rgba(255, 107, 107, 0.3)',
+                    borderRadius: '8px',
+                    color: '#a5a5a5',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 107, 107, 0.25) 0%, rgba(239, 68, 68, 0.25) 100%)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(239, 68, 68, 0.15) 100%)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  🌐 Web
                 </button>
               </div>
             </div>
 
-            <div className="breakpoints">
-              <h4>Breakpoints</h4>
+            {/* Breakpoints */}
+            <div style={{
+              padding: '20px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '12px',
+              backdropFilter: 'blur(10px)',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#737373',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  Breakpoints
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: '#737373',
+                }}>
+                  {breakpoints.length} configured
+                </div>
+              </div>
+
               {breakpoints.map((bp, index) => (
-                <div key={index} className="breakpoint-row">
-                  <div className="breakpoint-main">
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '14px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+                  }}
+                >
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    background: bp.frameId
+                      ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(48, 189, 113, 0.2) 100%)'
+                      : 'linear-gradient(135deg, rgba(91, 95, 199, 0.2) 0%, rgba(64, 69, 163, 0.2) 100%)',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                  }}>
+                    {bp.frameId ? '✓' : '📱'}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
                     <input
                       type="text"
                       value={bp.name}
                       onChange={(e) => updateBreakpoint(index, 'name', e.target.value)}
-                      placeholder="Name"
-                      className="breakpoint-input name"
+                      style={{
+                        width: '100%',
+                        padding: '6px 0',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#e5e5e5',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        outline: 'none',
+                      }}
                     />
-                    <div className="breakpoint-range">
-                      <input
-                        type="number"
-                        value={bp.minWidth}
-                        onChange={(e) =>
-                          updateBreakpoint(index, 'minWidth', Number(e.target.value))
-                        }
-                        placeholder="Min"
-                        className="breakpoint-input range"
-                      />
-                      <span className="range-separator">~</span>
-                      <input
-                        type="number"
-                        value={bp.maxWidth}
-                        onChange={(e) =>
-                          updateBreakpoint(index, 'maxWidth', Number(e.target.value))
-                        }
-                        placeholder="Max"
-                        className="breakpoint-input range"
-                      />
-                      <span className="unit">px</span>
                     </div>
-                  </div>
-                  <div className="breakpoint-actions">
-                    <button
-                      onClick={() => handleFrameSelect(index)}
-                      className={`frame-btn ${bp.frameId ? 'linked' : ''}`}
-                      title={bp.frameId ? 'Change linked frame' : 'Link a frame'}
-                    >
-                      {bp.frameId ? '🔗' : '➕'}
-                    </button>
-                    {bp.frameId && (
-                      <button
-                        onClick={() => handleTestBreakpoint(index)}
-                        className="test-btn"
-                        title="Test this breakpoint"
-                      >
-                        ▶️
-                      </button>
-                    )}
-                    <button
-                      onClick={() => removeBreakpoint(index)}
-                      className="remove-btn"
-                      title="Remove breakpoint"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button className="add-breakpoint" onClick={addBreakpoint}>
-                + Add Breakpoint
-              </button>
-            </div>
 
-            <div className="validation-info">
-              <p>
-                <strong>Required:</strong> Link at least one breakpoint to a frame
-              </p>
-              <p className="hint">Click ➕ to link frames from your canvas</p>
-            </div>
-
-            <button
-              className="create-button"
-              onClick={handleCreateAdaptiveLayout}
-              disabled={breakpoints.every((bp) => !bp.frameId)}
-            >
-              Create Adaptive Layout
-            </button>
-          </div>
-        ) : (
-          <div className="active-view">
-            <h3>🪗 Adaptive Layout Active</h3>
-
-            {currentBreakpoint && (
-              <div className="current-breakpoint">
-                <span className="breakpoint-label">Current:</span>
-                <span className="breakpoint-name">{currentBreakpoint}</span>
-              </div>
-            )}
-
-            <div className="breakpoint-indicator">
-              {breakpoints.map((bp, index) => (
-                <div
-                  key={index}
-                  className={`breakpoint-indicator-item ${
-                    currentBreakpoint === bp.name ? 'active' : ''
-                  }`}
-                >
-                  <div className="breakpoint-header">
-                    <span className="breakpoint-name">{bp.name}</span>
-                    <span className="breakpoint-status">
-                      {bp.frameId ? '✅' : '❌'}
-                    </span>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#737373',
+                    fontFamily: 'Monaco, monospace',
+                  }}>
+                    {bp.minWidth}-{bp.maxWidth}px
                   </div>
-                  <div className="breakpoint-range-display">
-                    {bp.minWidth}px - {bp.maxWidth}px
-                  </div>
+
                   <button
-                    onClick={() => handleTestBreakpoint(index)}
-                    className="test-breakpoint-btn"
-                    disabled={!bp.frameId}
-                  >
-                    Test {bp.name}
+                    onClick={() => handleFrameSelect(index)}
+                    style={{
+                      padding: '6px 12px',
+                      background: bp.frameId
+                        ? 'rgba(34, 197, 94, 0.15)'
+                        : 'rgba(91, 95, 199, 0.15)',
+                      border: bp.frameId
+                        ? '1px solid rgba(34, 197, 94, 0.3)'
+                        : '1px solid rgba(91, 95, 199, 0.3)',
+                      borderRadius: '6px',
+                      color: bp.frameId ? '#86efac' : '#a5b4fc',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    >
+                    {bp.frameId ? '✓ Linked' : '+ Link'}
                   </button>
                 </div>
               ))}
             </div>
 
-            <div className="active-layout-info">
-              <h4>How to Use</h4>
-              <ol className="instructions">
-                <li>Resize the master frame to see layout changes</li>
-                <li>Click "Test" buttons to preview specific breakpoints</li>
-                <li>Edit breakpoints in plugin settings</li>
-              </ol>
+            {/* Create Button */}
+            <button
+              onClick={handleCreateLayout}
+              disabled={breakpoints.every((bp) => !bp.frameId)}
+              style={{
+                width: '100%',
+                marginTop: '20px',
+                padding: '14px',
+                background: breakpoints.every((bp) => !bp.frameId)
+                  ? 'rgba(91, 95, 199, 0.2)'
+                  : 'linear-gradient(135deg, #5b5fc7 0%, #4045a3 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: breakpoints.every((bp) => !bp.frameId) ? '#737373' : 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: breakpoints.every((bp) => !bp.frameId) ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                boxShadow: breakpoints.every((bp) => !bp.frameId)
+                  ? 'none'
+                  : '0 4px 20px rgba(91, 95, 199, 0.3)',
+              }}
+              onMouseEnter={(e) => {
+                if (!breakpoints.every((bp) => !bp.frameId)) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(91, 95, 199, 0.4)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!breakpoints.every((bp) => !bp.frameId)) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(91, 95, 199, 0.3)';
+                }
+              }}
+            >
+              Create Adaptive Layout
+            </button>
+          </div>
+        ) : (
+          /* Active State */
+          <div style={{
+            padding: '32px',
+            background: 'linear-gradient(135deg, rgba(91, 95, 199, 0.1) 0%, rgba(64, 69, 163, 0.1) 100%)',
+            border: '1px solid rgba(91, 95, 199, 0.3)',
+            borderRadius: '12px',
+            textAlign: 'center',
+            backdropFilter: 'blur(10px)',
+          }}>
+            <div style={{
+              fontSize: '40px',
+              marginBottom: '12px',
+            }}>✨</div>
+
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: '0 0 8px 0',
+              background: 'linear-gradient(135deg, #fff 0%, #a5a5a5 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              Adaptive Layout Active
+            </h2>
+
+            {currentBreakpoint && (
+              <div style={{
+                marginBottom: '24px',
+                padding: '8px 16px',
+                background: 'rgba(91, 95, 199, 0.15)',
+                border: '1px solid rgba(91, 95, 199, 0.3)',
+                borderRadius: '20px',
+                display: 'inline-block',
+              }}>
+                <span style={{
+                  fontSize: '12px',
+                  color: '#a5b4fc',
+                  marginRight: '8px',
+                }}>
+                  Current:
+                </span>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#e5e5e5',
+                }}>
+                  {currentBreakpoint}
+                </span>
+              </div>
+            )}
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '12px',
+              marginBottom: '24px',
+            }}>
+              {breakpoints.map((bp, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleTestBreakpoint(index)}
+                  disabled={!bp.frameId}
+                  style={{
+                    padding: '16px',
+                    background: bp.frameId
+                      ? 'rgba(34, 197, 94, 0.1)'
+                      : 'rgba(255, 255, 255, 0.02)',
+                    border: bp.frameId
+                      ? '1px solid rgba(34, 197, 94, 0.3)'
+                      : '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '8px',
+                    color: bp.frameId ? '#e5e5e5' : '#737373',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: bp.frameId ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.2s',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (bp.frameId) {
+                      e.currentTarget.style.background = 'rgba(34, 197, 94, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (bp.frameId) {
+                      e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }
+                  }}
+                >
+                  <div style={{
+                    fontSize: '16px',
+                    marginBottom: '4px',
+                  }}>
+                    📱
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '2px',
+                  }}>
+                    {bp.name}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#737373',
+                  }}>
+                    {bp.minWidth}-{bp.maxWidth}px
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div style={{
+              padding: '16px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              borderRadius: '8px',
+              marginBottom: '20px',
+            }}>
+              <p style={{
+                fontSize: '13px',
+                color: '#a5a5a5',
+                margin: '0 0 8px 0',
+                lineHeight: '1.6',
+              }}>
+                Resize the frame to see automatic layout changes
+              </p>
+              <p style={{
+                fontSize: '13px',
+                color: '#737373',
+                margin: 0,
+                lineHeight: '1.6',
+              }}>
+                Click any breakpoint above to preview
+              </p>
             </div>
 
             <button
-              className="reset-button"
               onClick={() => {
                 setIsResponsive(false);
                 setCurrentBreakpoint(null);
+                sendMessage('edit-layout');
+              }}
+              style={{
+                padding: '12px 24px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: '#e5e5e5',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             >
               Edit Layout
             </button>
           </div>
         )}
-      </main>
+      </div>
 
-      <footer className="footer">
-        <button onClick={() => sendMessage('cancel')}>Close Plugin</button>
-      </footer>
+      {/* Footer */}
+      <div style={{
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '12px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(10, 10, 10, 0.8)',
+        backdropFilter: 'blur(20px)',
+      }}>
+        <div style={{
+          fontSize: '11px',
+          color: '#737373',
+        }}>
+          v1.0
+        </div>
+        <button
+          onClick={() => sendMessage('cancel')}
+          style={{
+            padding: '8px 16px',
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '6px',
+            color: '#737373',
+            fontSize: '12px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.color = '#e5e5e5';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = '#737373';
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default App;
+export { App };
